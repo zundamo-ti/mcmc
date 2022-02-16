@@ -1,6 +1,6 @@
 import pickle
 from random import random, sample, shuffle
-from math import exp
+from math import log
 
 import cv2
 import numpy as np
@@ -10,17 +10,12 @@ Point = tuple[int, int]
 
 
 class TravelingSalesman:
-    def __init__(
-        self, points: list[Point], color: tuple[int, int, int], t: float = 0.0
-    ) -> None:
+    def __init__(self, points: list[Point], color: tuple[int, int, int], t: float = 0.0) -> None:
         self.size = len(points)
         self.points = points
         self.path = list(range(self.size))
         self.length = sum(
-            self.dist(
-                self.points[self.path[i]],
-                self.points[self.path[i - 1]],
-            )
+            self.dist(self.points[self.path[i]], self.points[self.path[i - 1]])
             for i in range(self.size)
         )
         self.color = color
@@ -28,59 +23,39 @@ class TravelingSalesman:
 
     @staticmethod
     def dist(p1: Point, p2: Point) -> float:
-        return (
-            (p1[0] - p2[0]) * (p1[0] - p2[0])
-            + (p1[1] - p2[1]) * (p1[1] - p2[1])
-        ) ** 0.5
+        return ((p1[0] - p2[0]) * (p1[0] - p2[0]) + (p1[1] - p2[1]) * (p1[1] - p2[1])) ** 0.5
 
     def transit(self) -> bool:
         i, j = sample(range(self.size), 2)
         if i > j:
             i, j = j, i
-        length_diff = self.length_diff(i, j)
-        transit_probability = self.transit_probability(length_diff)
-        rand = random()
-        transit = rand < transit_probability
-        if rand < transit_probability:
+        diff = 0.0
+        diff += self.dist(self.points[j - 1], self.points[i - 1])
+        diff += self.dist(self.points[j], self.points[i])
+        diff -= self.dist(self.points[i], self.points[i - 1])
+        diff -= self.dist(self.points[j], self.points[j - 1])
+        if log(random()) * self.t < -diff:
             if i > 0:
-                self.path = (
-                    self.path[:i]
-                    + self.path[j - 1 : i - 1 : -1]
-                    + self.path[j:]
-                )
+                self.points = self.points[:i] + self.points[j - 1 : i - 1 : -1] + self.points[j:]
             elif i == 0:
-                self.path = self.path[j - 1 :: -1] + self.path[j:]
-            self.length += length_diff
-        return transit
+                self.points = self.points[j - 1 :: -1] + self.points[j:]
+            self.length += diff
+            return True
+        return False
 
-    def length_diff(self, i: int, j: int) -> float:
-        ret = 0.0
-        ret += self.dist(
-            self.points[self.path[j - 1]],
-            self.points[self.path[i - 1]],
+    def draw(self, figure: np.ndarray) -> None:
+        tempature_str = f"tempature: {int(self.t)}"
+        length_str = f"length: {int(self.length)}"
+        npoints_str = f"{self.size} points"
+        cv2.putText(
+            figure, tempature_str, (0, 15), cv2.FONT_HERSHEY_COMPLEX, 0.5, (255, 255, 255), 1
         )
-        ret += self.dist(
-            self.points[self.path[j]],
-            self.points[self.path[i]],
+        cv2.putText(figure, length_str, (0, 30), cv2.FONT_HERSHEY_COMPLEX, 0.5, (255, 255, 255), 1)
+        cv2.putText(
+            figure, npoints_str, (500, 15), cv2.FONT_HERSHEY_COMPLEX, 0.5, (255, 255, 255), 1
         )
-        ret -= self.dist(
-            self.points[self.path[i]],
-            self.points[self.path[i - 1]],
-        )
-        ret -= self.dist(
-            self.points[self.path[j]],
-            self.points[self.path[j - 1]],
-        )
-        return ret
-
-    def transit_probability(self, length_diff: float) -> float:
-        try:
-            prob = min(exp(-length_diff / self.t), 1)
-        except OverflowError:
-            prob = 1
-        except ZeroDivisionError:
-            prob = int(length_diff < 0)
-        return prob
+        for p1, p2 in zip(self.points, self.points[1:] + [self.points[0]]):
+            cv2.line(figure, p1, p2, color=self.color, thickness=2)
 
     def simulate(self) -> None:
         while True:
@@ -89,48 +64,8 @@ class TravelingSalesman:
                 continue
 
             # showing
-            loop = self.path.copy()
-            loop.append(self.path[0])
-            points = [self.points[i] for i in loop]
-            figure = np.zeros(
-                shape=(640, 640, 3),
-                dtype=np.uint8,
-            )
-            for i in range(self.size + 1):
-                cv2.line(
-                    figure,
-                    points[i - 1],
-                    points[i],
-                    color=self.color,
-                    thickness=2,
-                )
-            cv2.putText(
-                figure,
-                f"t: {int(self.t)}",
-                (0, 15),
-                cv2.FONT_HERSHEY_COMPLEX,
-                0.5,
-                color=(255, 255, 255),
-                thickness=1,
-            )
-            cv2.putText(
-                figure,
-                f"length: {int(self.length)}",
-                (0, 30),
-                cv2.FONT_HERSHEY_COMPLEX,
-                0.5,
-                color=(255, 255, 255),
-                thickness=1,
-            )
-            cv2.putText(
-                figure,
-                f"{self.size} points",
-                (500, 15),
-                cv2.FONT_HERSHEY_COMPLEX,
-                0.5,
-                color=(255, 255, 255),
-                thickness=1,
-            )
+            figure = np.zeros(shape=(640, 640, 3), dtype=np.uint8)
+            self.draw(figure)
             cv2.imshow("win", figure)
             key = cv2.waitKey(1)
             if key & 0xFF == 27:
