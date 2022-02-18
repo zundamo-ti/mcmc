@@ -41,7 +41,7 @@ if __name__ == "__main__":
     parser = ArgumentParser()
     parser.add_argument("-f", "--filename", required=True)
     args = parser.parse_args()
-    filename: str = f"{args.filename}.pkl"
+    filename: str = args.filename
     pl = Pointillismer("pointillismer")
     pl.start()
 

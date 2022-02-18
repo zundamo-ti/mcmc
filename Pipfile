@@ -9,6 +9,7 @@ opencv-python = "*"
 numpy = "*"
 flask = "*"
 gunicorn = "*"
+pulp = "*"
 
 [dev-packages]
 mypy = "*"
