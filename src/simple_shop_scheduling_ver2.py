@@ -40,7 +40,7 @@ class SimpleShopScheduling:
             (job, machine): cost[job][machine]
             for job, machine in self.vertices
         }
-        self.order = list(range(n_jobs))
+        self.order = list(range(n_machines))
         makespan, start_times = self.__calc()
         self.makespan = makespan
         self.start_times = start_times
@@ -63,26 +63,26 @@ class SimpleShopScheduling:
         }
         finish = pulp.LpVariable("finish", cat=pulp.LpInteger)
         problem += finish
-        for job in range(self.n_jobs):
-            problem += 0 <= start_variables[job, 0]
+        for machine in range(self.n_machines):
+            problem += 0 <= start_variables[0, machine]
             problem += (
-                start_variables[job, self.n_machines - 1]
-                + self.cost[job, self.n_machines - 1]
+                start_variables[self.n_jobs - 1, machine]
+                + self.cost[self.n_jobs - 1, machine]
                 <= finish
             )
         for job, machine in itertools.product(
-            range(self.n_jobs), range(self.n_machines - 1)
+            range(self.n_jobs - 1), range(self.n_machines)
         ):
             problem += (
                 start_variables[job, machine] + self.cost[job, machine]
-                <= start_variables[job, machine + 1]
+                <= start_variables[job + 1, machine]
             )
-        for i in range(self.n_jobs - 1):
-            job1, job2 = self.order[i : i + 2]
-            for machine in range(self.n_machines):
+        for i in range(self.n_machines - 1):
+            machine1, machine2 = self.order[i : i + 2]
+            for job in range(self.n_jobs):
                 problem += (
-                    start_variables[job1, machine] + self.cost[job1, machine]
-                    <= start_variables[job2, machine]
+                    start_variables[job, machine1] + self.cost[job, machine1]
+                    <= start_variables[job, machine2]
                 )
         solver = pulp.PULP_CBC_CMD(timeLimit=1, gapRel=0.01, msg=False)
         status = problem.solve(solver)
@@ -95,7 +95,7 @@ class SimpleShopScheduling:
         return makespan, start_times
 
     def transit(self) -> bool:
-        i, j = random.sample(range(n_jobs), 2)
+        i, j = random.sample(range(self.n_machines), 2)
         self.order[i], self.order[j] = self.order[j], self.order[i]
         makespan, start_times = self.__calc()
         diff = makespan - self.makespan
@@ -108,14 +108,15 @@ class SimpleShopScheduling:
 
     def draw(self, image: np.ndarray) -> None:
         padding_top = 50
+        padding_left = 50
         width = 1
         height = 20
-        for job, machine in itertools.product(
-            range(self.n_jobs), range(self.n_machines)
+        for job, (index, machine) in itertools.product(
+            range(self.n_jobs), enumerate(self.order)
         ):
-            top = int(machine * height + padding_top)
+            top = int(index * height + padding_top)
             bottom = top + int(height)
-            left = int(self.start_times[job, machine] * width)
+            left = int(self.start_times[job, machine] * width + padding_left)
             right = left + int(self.cost[job, machine] * width)
             cv2.rectangle(
                 image,
@@ -123,6 +124,15 @@ class SimpleShopScheduling:
                 (right, bottom),
                 COLORS[job % len(COLORS)],
                 -1,
+            )
+            cv2.putText(
+                image,
+                f"{machine}",
+                (0, bottom),
+                cv2.FONT_HERSHEY_COMPLEX,
+                0.5,
+                (255, 255, 255),
+                1,
             )
         cv2.putText(
             image,
@@ -173,8 +183,8 @@ if __name__ == "__main__":
     from argparse import ArgumentParser
 
     parser = ArgumentParser()
-    parser.add_argument("-j", "--n-jobs", type=int, default=20)
-    parser.add_argument("-m", "--n-machines", type=int, default=10)
+    parser.add_argument("-j", "--n-jobs", type=int, default=10)
+    parser.add_argument("-m", "--n-machines", type=int, default=20)
     parser.add_argument("-t", "--tempature", type=int, default=0)
     args = parser.parse_args()
     n_jobs: int = args.n_jobs

@@ -10,6 +10,7 @@ numpy = "*"
 flask = "*"
 gunicorn = "*"
 pulp = "*"
+pandas = "*"
 
 [dev-packages]
 mypy = "*"
